@@ -1,0 +1,8 @@
+encryptionsalt: v1:nJ6TiA8Hi/4=:v1:U6jU9wWiKIv+EFmv:1aELdVPLuxCwtnhznrOdqdMLc1i+Yg==
+config:
+  aws:profile: keken-devops-us
+  aws:region: us-east-1
+  pipeline:awsAccountId: "702945800168"
+  pipeline:codestarconnectionArn: "arn:aws:codestar-connections:us-east-1:702945800168:connection/71e762c7-5ae4-46e3-8e68-4f3bff33b268"
+  pipeline:backend-url: "s3://keken-pulumi-state-storage"
+
