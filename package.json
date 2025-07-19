@@ -1,5 +1,6 @@
 {
-    "name": "pipeline",
+    "name": "aws-pipeline-component",
+    "description": "A Pulumi component for creating AWS CodePipeline with CodeBuild projects.",
     "main": "index.ts",
     "devDependencies": {
         "@types/node": "^18",
