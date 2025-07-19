@@ -31,7 +31,7 @@ export interface PipelineArgs {
 
 
 export class AwsPipeline extends pulumi.ComponentResource {
-  
+
   public readonly codeBuildProjects: Record<string, aws.codebuild.Project> = {};
   public readonly codeBuildRole: aws.iam.Role;
   public readonly pipelineRole: aws.iam.Role;
@@ -42,8 +42,10 @@ export class AwsPipeline extends pulumi.ComponentResource {
 
   constructor(name: string, args: PipelineArgs, opts?: pulumi.ComponentResourceOptions) {
     super("pipeline-component:index:Pipeline", name, args, opts);
-
     this.name = args.nameCallback ?? ((r) => `${name}-${r}`);
+
+    args.crossAccountDeploymentRoleName ??= "CrossAccountDeploymentRole";
+
     // Crear roles IAM
     this.codeBuildRole = this.createRole("codebuild", "codebuild.amazonaws.com");
     this.pipelineRole = this.createRole("pipeline", "codepipeline.amazonaws.com");
@@ -58,10 +60,7 @@ export class AwsPipeline extends pulumi.ComponentResource {
       }
     }
     // Si hay cuentas de destino únicas, otorgar acceso cross-account
-    if (
-      this.uniqueTargetAccounts.size > 0 &&
-      args.crossAccountDeploymentRoleName
-    ) {
+    if (this.uniqueTargetAccounts.size > 0) {
       this.grantCrossAccountAccess(
         Array.from(this.uniqueTargetAccounts),
         args.crossAccountDeploymentRoleName,
