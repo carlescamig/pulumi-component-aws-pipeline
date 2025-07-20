@@ -2,6 +2,8 @@ import * as pulumi from "@pulumi/pulumi";
 import { Output } from "@pulumi/pulumi";
 import * as aws from "@pulumi/aws";
 
+type ResourceName = (resourceName: string) => string;
+
 interface EnvironmentVariable {
   name: string;
   value: string;
@@ -40,16 +42,17 @@ export class AwsPipeline extends pulumi.ComponentResource {
 
   constructor(name: string, args: PipelineArgs, opts?: pulumi.ComponentResourceOptions, nameCallback?: (resourceName: string) => string) {
     super("pipeline-component:index:Pipeline", name, args, opts);
-    const resourceName = nameCallback ?? ((r) => `${name}-${r}`)
-    this.artifactBucket = this.createArtifactBucket(resourceName('bucket-artifacts'));
+
+    const resourceName = nameCallback ?? ((r) => `${name}-${r}`);
+    this.artifactBucket = this.createArtifactBucket(resourceName);
     args.crossAccountDeploymentRoleName ??= "CrossAccountDeploymentRole";
 
     // Crear roles IAM
-    this.codeBuildRole = this.createRole(resourceName("role-codebuild"), "codebuild.amazonaws.com");
-    this.pipelineRole = this.createRole(resourceName("role-pipeline"), "codepipeline.amazonaws.com");
+    this.codeBuildRole = this.createRole("codebuild", "codebuild.amazonaws.com", resourceName);
+    this.pipelineRole = this.createRole("pipeline", "codepipeline.amazonaws.com", resourceName);
     // Adjuntar políticas a los roles
-    this.attachPolicy(resourceName("codebuild-policy-attachment"), this.codeBuildRole, aws.iam.ManagedPolicies.AdministratorAccess);
-    this.attachPolicy(resourceName("pipeline-policy-attachment"), this.pipelineRole, aws.iam.ManagedPolicies.AdministratorAccess);
+    this.attachPolicy("codebuild", this.codeBuildRole, aws.iam.ManagedPolicies.AdministratorAccess, resourceName);
+    this.attachPolicy("pipeline", this.pipelineRole, aws.iam.ManagedPolicies.AdministratorAccess, resourceName);
 
     // Permitir acceso cross-account
     const uniqueAccounts = new Set<string>();
@@ -62,10 +65,10 @@ export class AwsPipeline extends pulumi.ComponentResource {
     // Si hay cuentas de destino únicas, otorgar acceso cross-account
     if (uniqueAccounts.size > 0) {
       this.grantCrossAccountAccess(
-        resourceName("assume-crossaccount-role"),
         Array.from(uniqueAccounts),
         args.crossAccountDeploymentRoleName,
-        args.pulumiBackendBucketName
+        resourceName,
+        args.pulumiBackendBucketName,
       );
     }
 
@@ -91,7 +94,7 @@ export class AwsPipeline extends pulumi.ComponentResource {
 
     // Build Projects
     for (const stage of args.stages) {
-      this.codeBuildProjects[stage.name] = this.createCodeBuildProject(resourceName(`codebuild-${args.name}-${stage.name}`), stage);
+      this.codeBuildProjects[stage.name] = this.createCodeBuildProject(args.name, stage, resourceName);
     }
 
     // Pipeline Stages
@@ -117,28 +120,29 @@ export class AwsPipeline extends pulumi.ComponentResource {
     });
   }
 
-  private createArtifactBucket(name: string): aws.s3.Bucket {
-    return new aws.s3.Bucket(name);
+  private createArtifactBucket(resourceName: ResourceName): aws.s3.Bucket {
+    return new aws.s3.Bucket(resourceName(`bucket-artifacts`));
   }
 
-  private createRole(name: string, servicePrincipal: string): aws.iam.Role {
-    return new aws.iam.Role(name, {
-      name: name,
+  private createRole(nameSuffix: string, servicePrincipal: string, resourceName: ResourceName): aws.iam.Role {
+    return new aws.iam.Role(resourceName(`role-${nameSuffix}`), {
+      name: resourceName(`role-${nameSuffix}`),
       assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({ Service: servicePrincipal }),
     });
   }
 
-  private attachPolicy(name: string, role: aws.iam.Role, policyArn: string): aws.iam.RolePolicyAttachment {
-    return new aws.iam.RolePolicyAttachment(name, {
+  private attachPolicy(prefix: string, role: aws.iam.Role, policyArn: string, resourceName: ResourceName): aws.iam.RolePolicyAttachment {
+    return new aws.iam.RolePolicyAttachment(resourceName(`${prefix}-policy-attachment`), {
       role,
       policyArn,
     });
   }
 
-  private createCodeBuildProject(name: string, stage: PipelineArgs["stages"][0]): aws.codebuild.Project {
+  private createCodeBuildProject(prefix: string, stage: PipelineArgs["stages"][0], resourceName: ResourceName): aws.codebuild.Project {
+    const projectName = resourceName(`codebuild-${prefix}-${stage.name}`);
 
-    return new aws.codebuild.Project(name, {
-      name,
+    return new aws.codebuild.Project(projectName, {
+      name: projectName,
       source: {
         type: "CODEPIPELINE",
         buildspec: stage.build.buildspec,
@@ -201,10 +205,10 @@ export class AwsPipeline extends pulumi.ComponentResource {
   }
 
   private grantCrossAccountAccess(
-    name: string,
     targetAccountIds: string[],
     crossAccountRoleName: string,
-    pulumiBackendBucketName?: string
+    resourceName: ResourceName,
+    pulumiBackendBucketName?: string,
   ) {
     const assumeRolePolicy = {
       Version: "2012-10-17",
@@ -215,8 +219,8 @@ export class AwsPipeline extends pulumi.ComponentResource {
       })),
     };
 
-    new aws.iam.RolePolicy(name, {
-      name,
+    new aws.iam.RolePolicy(resourceName("assume-crossaccount-role"), {
+      name: resourceName("assume-crossaccount-role"),
       role: this.codeBuildRole.name,
       policy: JSON.stringify(assumeRolePolicy),
     });
@@ -224,7 +228,7 @@ export class AwsPipeline extends pulumi.ComponentResource {
     // Permitir acceso al bucket de Pulumi backend
     if (pulumiBackendBucketName)
       new aws.s3.BucketPolicy(
-        `${pulumiBackendBucketName}-crossaccount-access`,
+        resourceName("pulumi-crossaccount-access"),
         {
           bucket: pulumiBackendBucketName,
           policy: JSON.stringify({
