@@ -34,6 +34,14 @@ export interface PipelineArgs {
 
 export class AwsPipeline extends pulumi.ComponentResource {
 
+  public readonly arn: Output<string>;
+  public readonly name: Output<string>;
+  public readonly crossAccountInstructions: pulumi.Output<{
+    accountId: string;
+    roleName: string;
+    cliInstructions: string;
+  }[]>;
+
   public readonly codeBuildProjects: Record<string, aws.codebuild.Project> = {};
   public readonly codeBuildRole: aws.iam.Role;
   public readonly pipelineRole: aws.iam.Role;
@@ -114,9 +122,49 @@ export class AwsPipeline extends pulumi.ComponentResource {
       stages: this.stages,
     });
 
+    this.crossAccountInstructions = pulumi.output(
+      Array.from(uniqueAccounts).map(accountId => {
+        const roleName = args.crossAccountDeploymentRoleName!;
+        const trustedAccountId = pulumi.output(aws.getCallerIdentity({})).apply(id => id.accountId);
+        const assumePolicy = {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: {
+                AWS: `arn:aws:iam::${trustedAccountId}:root`,
+              },
+              Action: "sts:AssumeRole",
+            },
+          ],
+        };
+
+        const command = [
+          `aws iam create-role \\`,
+          `  --role-name ${roleName} \\`,
+          `  --assume-role-policy-document '${JSON.stringify(assumePolicy, null, 2)}' \\`,
+          `  --description "Role to be assumed by CodeBuild pipeline from account ${trustedAccountId}"`,
+          '',
+          `# Optionally attach permissions, e.g. AdministratorAccess (not recommended for production):`,
+          `aws iam attach-role-policy \\`,
+          `  --role-name ${roleName} \\`,
+          `  --policy-arn arn:aws:iam::aws:policy/AdministratorAccess`,
+        ].join("\n");
+
+        return {
+          accountId,
+          roleName,
+          cliInstructions: command,
+        };
+      })
+    );
+    this.arn = pipeline.arn;
+    this.name = pipeline.name;
+
     this.registerOutputs({
       arn: pipeline.arn,
       name: pipeline.name,
+      crossAccountInstructions: this.crossAccountInstructions
     });
   }
 
