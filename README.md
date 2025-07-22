@@ -1,86 +1,43 @@
- # Crear rol sobre cada cuenta destino
- aws s3api create-bucket \
-  --bucket "$BUCKET_NAME" \
-  --region "$REGION"
+# Pulumi AWS Pipeline Component
 
- aws iam create-role \
-  --role-name CrossAccountDeploymentRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Principal": {
-          "AWS": "arn:aws:iam::914210060230:role/pipeline-devops-role-codebuild"
-        },
-        "Action": "sts:AssumeRole"
-      }
-    ]
-  }'
+This package provides a reusable Pulumi component to define and deploy AWS CodePipeline pipelines with support for custom naming conventions, cross-account deployments, and flexible build stages.
 
-  aws iam attach-role-policy \
-  --role-name CrossAccountDeploymentRole \
-  --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+## Features
 
+- Custom naming through a `nameCallback` function.
+- Support for CodeStar Connections.
+- Optional cross-account role configuration.
+- S3 backend bucket support for Pulumi state.
+- Easy extensibility and reusable structure.
 
- # AWS TypeScript Pulumi Template
+## Usage
 
- A minimal Pulumi template for provisioning AWS infrastructure using TypeScript. This template creates an Amazon S3 bucket and exports its name.
+```ts
+import { AwsPipeline } from "@myorg/pipeline";
 
- ## Prerequisites
+const pipeline = new AwsPipeline("my-pipeline", {
+  name: "my-pipeline",
+  fullRepositoryId: "myorg/myrepo",
+  branch: "main",
+  codestarconnectionArn: connection.arn,
+  stages: [...],
+  nameCallback: (base) => `myorg-${base}`,
+});
+```
 
- - Pulumi CLI (>= v3): https://www.pulumi.com/docs/get-started/install/
- - Node.js (>= 14): https://nodejs.org/
- - AWS credentials configured (e.g., via `aws configure` or environment variables)
+## PipelineArgs
 
- ## Getting Started
+| Name | Type | Description |
+|------|------|-------------|
+| name | string | Base name of the pipeline |
+| fullRepositoryId | string | Repository identifier (e.g., `org/repo`) |
+| branch | string | Branch to track |
+| stages | BuildStage[] | List of CodeBuild stages |
+| codestarconnectionArn | Output<string> | ARN of the CodeStar Connection |
+| crossAccountDeploymentRoleName | string (optional) | IAM Role name for cross-account deployments |
+| pulumiBackendBucketName | string (optional) | S3 bucket for Pulumi backend |
+| nameCallback | (resourceName: string) => string (optional) | Function to customize naming |
 
- 1. Initialize a new Pulumi project:
+## License
 
-    ```bash
-    pulumi new aws-typescript
-    ```
-
-    Follow the prompts to set your:
-    - Project name
-    - Project description
-    - AWS region (defaults to `us-east-1`)
-
- 2. Preview and deploy your infrastructure:
-
-    ```bash
-    pulumi preview
-    pulumi up
-    ```
-
- 3. When you're finished, tear down your stack:
-
-    ```bash
-    pulumi destroy
-    pulumi stack rm
-    ```
-
- ## Project Layout
-
- - `Pulumi.yaml` — Pulumi project and template metadata
- - `index.ts` — Main Pulumi program (creates an S3 bucket)
- - `package.json` — Node.js dependencies
- - `tsconfig.json` — TypeScript compiler options
-
- ## Configuration
-
- | Key           | Description                             | Default     |
- | ------------- | --------------------------------------- | ----------- |
- | `aws:region`  | The AWS region to deploy resources into | `us-east-1` |
-
- Use `pulumi config set <key> <value>` to customize configuration.
-
- ## Next Steps
-
- - Extend `index.ts` to provision additional resources (e.g., VPCs, Lambda functions, DynamoDB tables).
- - Explore [Pulumi AWSX](https://www.pulumi.com/docs/reference/pkg/awsx/) for higher-level AWS components.
- - Consult the [Pulumi documentation](https://www.pulumi.com/docs/) for more examples and best practices.
-
- ## Getting Help
-
- If you encounter any issues or have suggestions, please open an issue in this repository.
+MIT
