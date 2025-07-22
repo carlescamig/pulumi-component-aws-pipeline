@@ -1,4 +1,4 @@
-# Pulumi AWS Pipeline Component
+# Pulumi CI/CD Pipeline for AWS with Cross-Account Support
 
 This package provides a reusable Pulumi component to define and deploy AWS CodePipeline pipelines with support for custom naming conventions, cross-account deployments, and flexible build stages.
 
