@@ -36,12 +36,7 @@ export class AwsPipeline extends pulumi.ComponentResource {
 
   public readonly arn: Output<string>;
   public readonly name: Output<string>;
-  public readonly crossAccountInstructions: pulumi.Output<{
-    accountId: string;
-    roleName: string;
-    cliInstructions: string;
-  }[]>;
-
+  public readonly crossAccountInstructions: pulumi.Output<Record<string, string>>;
   public readonly codeBuildProjects: Record<string, aws.codebuild.Project> = {};
   public readonly codeBuildRole: aws.iam.Role;
   public readonly pipelineRole: aws.iam.Role;
@@ -123,39 +118,39 @@ export class AwsPipeline extends pulumi.ComponentResource {
     });
 
     this.crossAccountInstructions = pulumi.output(
-      Array.from(uniqueAccounts).map(accountId => {
-        const roleName = args.crossAccountDeploymentRoleName!;
-        const trustedAccountId = pulumi.output(aws.getCallerIdentity({})).apply(id => id.accountId);
-        const assumePolicy = {
-          Version: "2012-10-17",
-          Statement: [
-            {
-              Effect: "Allow",
-              Principal: {
-                AWS: `arn:aws:iam::${trustedAccountId}:root`,
+      pulumi.output(aws.getCallerIdentity({})).apply(identity => {
+        const trustedAccountId = identity.accountId;
+        const entries: Record<string, string> = {};
+
+        for (const accountId of uniqueAccounts) {
+          const roleName = args.crossAccountDeploymentRoleName!;
+          const assumePolicy = {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: {
+                  AWS: `arn:aws:iam::${trustedAccountId}:root`,
+                },
+                Action: "sts:AssumeRole",
               },
-              Action: "sts:AssumeRole",
-            },
-          ],
-        };
+            ],
+          };
 
-        const command = [
-          `aws iam create-role \\`,
-          `  --role-name ${roleName} \\`,
-          `  --assume-role-policy-document '${JSON.stringify(assumePolicy, null, 2)}' \\`,
-          `  --description "Role to be assumed by CodeBuild pipeline from account ${trustedAccountId}"`,
-          '',
-          `# Optionally attach permissions, e.g. AdministratorAccess (not recommended for production):`,
-          `aws iam attach-role-policy \\`,
-          `  --role-name ${roleName} \\`,
-          `  --policy-arn arn:aws:iam::aws:policy/AdministratorAccess`,
-        ].join("\n");
 
-        return {
-          accountId,
-          roleName,
-          cliInstructions: command,
-        };
+          entries[`create role at ${accountId}`] = [
+            `aws iam create-role --role-name ${roleName}`,
+            `--assume-role-policy-document '${JSON.stringify(assumePolicy)}'`,
+            `--description "Role to be assumed by CodeBuild pipeline from account ${trustedAccountId}"`,
+          ].join(" ");
+          entries[`attach role policy`] = [
+            `aws iam attach-role-policy`,
+            `--role-name ${roleName}`,
+            `--policy-arn arn:aws:iam::aws:policy/AdministratorAccess`,
+          ].join(" ");
+        }
+
+        return entries;
       })
     );
     this.arn = pipeline.arn;
