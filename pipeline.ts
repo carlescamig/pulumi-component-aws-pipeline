@@ -25,7 +25,8 @@ export interface PipelineArgs {
   name: string;
   fullRepositoryId: string;
   branch: string;
-  stages: BuildStage[];
+  sourceStagesActions?: BuildStage[];
+  buildStages: BuildStage[];
   codestarconnectionArn: Output<string>; // ARN de la conexión de CodeStar
   crossAccountDeploymentRoleName?: string;
   pulumiBackendBucketName?: string;
@@ -54,12 +55,12 @@ export class AwsPipeline extends pulumi.ComponentResource {
     this.codeBuildRole = this.createRole("codebuild", "codebuild.amazonaws.com", resourceName);
     this.pipelineRole = this.createRole("pipeline", "codepipeline.amazonaws.com", resourceName);
     // Adjuntar políticas a los roles
-    this.attachPolicy("codebuild", this.codeBuildRole, aws.iam.ManagedPolicies.AdministratorAccess, resourceName);
-    this.attachPolicy("pipeline", this.pipelineRole, aws.iam.ManagedPolicies.AdministratorAccess, resourceName);
+    this.attachPolicy("codebuild", this.codeBuildRole, aws.iam.ManagedPolicy.AdministratorAccess, resourceName);
+    this.attachPolicy("pipeline", this.pipelineRole, aws.iam.ManagedPolicy.AdministratorAccess, resourceName);
 
     // Permitir acceso cross-account
     const uniqueAccounts = new Set<string>();
-    for (const stage of args.stages) {
+    for (const stage of args.buildStages) {
       if (stage.targetAccountId?.length) {
         stage.targetAccountId.forEach(accountId => uniqueAccounts.add(accountId));
       }
@@ -96,12 +97,12 @@ export class AwsPipeline extends pulumi.ComponentResource {
     });
 
     // Build Projects
-    for (const stage of args.stages) {
+    for (const stage of args.buildStages) {
       this.codeBuildProjects[stage.name] = this.createCodeBuildProject(args.name, stage, resourceName);
     }
 
     // Pipeline Stages
-    for (const stage of args.stages) {
+    for (const stage of args.buildStages) {
       this.stages.push(this.createPipelineStage(stage));
     }
 
@@ -181,7 +182,7 @@ export class AwsPipeline extends pulumi.ComponentResource {
     });
   }
 
-  private createCodeBuildProject(prefix: string, stage: PipelineArgs["stages"][0], resourceName: ResourceName): aws.codebuild.Project {
+  private createCodeBuildProject(prefix: string, stage: PipelineArgs["buildStages"][0], resourceName: ResourceName): aws.codebuild.Project {
     const projectName = resourceName(`codebuild-${prefix}-${stage.name}`);
 
     return new aws.codebuild.Project(projectName, {
@@ -207,7 +208,7 @@ export class AwsPipeline extends pulumi.ComponentResource {
     });
   }
 
-  private createPipelineStage(stage: PipelineArgs["stages"][0]): aws.types.input.codepipeline.PipelineStage {
+  private createPipelineStage(stage: PipelineArgs["buildStages"][0]): aws.types.input.codepipeline.PipelineStage {
     let runOrder = 1;
     const actions: aws.types.input.codepipeline.PipelineStageAction[] = [];
 

@@ -20,7 +20,7 @@ const pipeline = new AwsPipeline("my-pipeline", {
   fullRepositoryId: "myorg/myrepo",
   branch: "main",
   codestarconnectionArn: connection.arn,
-  stages: [...],
+  buildStages: [...],
   nameCallback: (base) => `myorg-${base}`,
 });
 ```
@@ -32,7 +32,8 @@ const pipeline = new AwsPipeline("my-pipeline", {
 | name | string | Base name of the pipeline |
 | fullRepositoryId | string | Repository identifier (e.g., `org/repo`) |
 | branch | string | Branch to track |
-| stages | BuildStage[] | List of CodeBuild stages |
+| sourceStagesActions | SourceStage[] (optional)| List of Source stage actions |
+| buildStages | BuildStage[] | List of CodeBuild stages |
 | codestarconnectionArn | Output<string> | ARN of the CodeStar Connection |
 | crossAccountDeploymentRoleName | string (optional) | IAM Role name for cross-account deployments |
 | pulumiBackendBucketName | string (optional) | S3 bucket for Pulumi backend |

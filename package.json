@@ -3,12 +3,12 @@
     "description": "A Pulumi component for creating AWS CodePipeline with CodeBuild projects.",
     "main": "index.ts",
     "devDependencies": {
-        "@types/node": "^18",
+        "@types/node": "^20",
         "typescript": "^5.0.0"
     },
     "dependencies": {
-        "@pulumi/aws": "^6.0.0",
-        "@pulumi/awsx": "^2.0.2",
-        "@pulumi/pulumi": "^3.113.0"
+        "@pulumi/aws": "^7.1.0",
+        "@pulumi/awsx": "^3.0.0",
+        "@pulumi/pulumi": "^3.185.0"
     }
 }
