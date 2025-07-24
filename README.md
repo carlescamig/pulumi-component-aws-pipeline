@@ -32,7 +32,7 @@ const pipeline = new AwsPipeline("my-pipeline", {
 | name | string | Base name of the pipeline |
 | fullRepositoryId | string | Repository identifier (e.g., `org/repo`) |
 | branch | string | Branch to track |
-| sourceStagesActions | SourceStage[] (optional)| List of Source stage actions |
+| sourceStageActions | aws.types.input.codepipeline.PipelineStageAction[] (optional)| List of Source stage actions |
 | buildStages | BuildStage[] | List of CodeBuild stages |
 | codestarconnectionArn | Output<string> | ARN of the CodeStar Connection |
 | crossAccountDeploymentRoleName | string (optional) | IAM Role name for cross-account deployments |
